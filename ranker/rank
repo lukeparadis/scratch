@@ -1,0 +1,192 @@
+#! /usr/bin/env python3
+
+import itertools
+import os
+import sys
+import json
+from collections import Counter
+import pprint
+import random
+import argparse
+
+class Ranker(object):
+
+    def __init__(self, options, data_filename=None, resume=False):
+
+        self.options = options
+        self.data_filename = data_filename or f'./data.dat'
+
+        if os.path.exists(self.data_filename) and resume:
+            self.load()
+        else:
+            self.pairs = list(itertools.combinations(list(range(len(self.options))), 2))
+            random.shuffle(self.pairs)
+            self.choices = {}
+
+    def load(self):
+
+        with open(self.data_filename, 'r') as fh:
+            data = json.load(fh)
+        self.pairs = data['pairs']
+        loaded_choices = data['choices']
+        self.choices = { (e['option1'],e['option2']) : e['choice'] for e in loaded_choices }
+        self.counts = data['counts']
+        self.rounds = data['rounds']
+
+    def save(self):
+
+        saved_choices = [ { 'option1' : p[0], 'option2' : p[1], 'choice' : choice} for (p,choice) in self.choices.items() ]
+
+        data = {
+            'scores' : self.scores,
+            'pairs' : self.pairs,
+            'choices' : saved_choices,
+            'counts' : dict(self.counts),
+            'rounds' : dict(self.rounds),
+        }
+
+        with open(self.data_filename, 'w') as fh:
+            json.dump(data, fh, sort_keys=True, indent=4)
+
+    def rank(self, num_to_rank=None):
+    
+        total = len(self.pairs)
+        count = 0
+
+        if num_to_rank is not None and num_to_rank <= 0:
+            print('please choose non zero number of pairs to rank')
+            sys.exit(1)
+
+        for pair in self.pairs:
+            if pair not in self.choices:
+                complete = len(self.choices)
+                print(f'{complete}/{total}\n')
+                opt1, opt2 = pair 
+                self.choices[pair] = self.compare(opt1, opt2)
+
+                if num_to_rank is not None:
+                    count += 1
+                    if count == num_to_rank:
+                        break
+
+        self.compute_scores()
+        self.save()
+
+        rankings = self.compute_rankings()
+    
+        return rankings
+
+    def compare(self, opt1, opt2):
+
+        print(f'(1) {self.options[opt1]}')
+        print(f'(2) {self.options[opt2]}')
+        choice = int(input('option: '))
+        print()
+
+        if choice == 1:
+            return 0
+        elif choice == 2:
+            return 1
+        else:
+            print('must select (1) or (2)')
+            sys.exit(1)
+        
+        return choice
+
+    def compute_scores(self):
+
+        self.rounds = Counter()
+        self.counts = Counter()
+        self.scores = {}
+
+        #pprint.pprint(self.choices)
+
+        for (opt1,opt2),choice in self.choices.items():
+            self.rounds[opt1] += 1
+            self.rounds[opt2] += 1
+            
+            if choice == 0:
+                self.counts[opt1] += 1
+                self.counts[opt2] -= 1
+            else:
+                self.counts[opt1] -= 1
+                self.counts[opt2] += 1
+
+        for option in range(len(self.options)):
+            if option in self.rounds:
+                #self.scores[option] = self.counts[option] / self.rounds[option]
+                self.scores[option] = self.counts[option]
+            else:
+                #self.scores[option] = float('-inf')
+                self.scores[option] = 0
+
+    def compute_rankings(self):
+            
+        sorted_scores = sorted(self.scores.items(), key=lambda k:k[1], reverse=True)
+      
+        rankings = []
+
+        for k,(opt,score) in enumerate(sorted_scores):
+            element = {
+                'option' : self.options[opt],
+                'score' : score,
+                'rank' : k+1,
+                'count' : self.counts[opt],
+                'rounds' : self.rounds[opt],
+            }
+
+            rankings.append(element)
+
+        return rankings
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser('tool to run pairwise rankings')
+    parser.add_argument('options-file')
+    parser.add_argument('--resume', '-r', action='store_true')
+    parser.add_argument('--num-to-rank', '-n', default=None, type=int)
+
+    args = vars(parser.parse_args())
+
+    print(args)
+
+    print(args['options-file'])
+    #print(args.options_file)
+    #sys.exit()
+
+    # create output filenames
+    base,_ = os.path.splitext(args['options-file'])
+    output_file_json = base + '-rankings.json'
+    output_file_csv = base + '-rankings.csv'
+    data_filename = base + '.dat'
+
+    # read in options
+    with open(args['options-file'], 'r') as fh:
+        options = [ line.strip() for line in fh.readlines() ]
+
+    # create ranker
+    ranker = Ranker(
+        options = options,
+        data_filename = data_filename,
+        resume = args['resume'],
+    )
+
+    # rank N pairs
+    rankings = ranker.rank(args['num_to_rank'])
+   
+    # write rankings to file
+    with open(output_file_json, 'w') as fh:
+        json.dump(rankings, fh, sort_keys=True, indent=4)
+    
+    columns = ('option','rank','score','count','rounds')
+    with open(output_file_csv, 'w') as fh:
+        fh.write(','.join(columns))
+        for r in rankings:
+            line = ','.join([str(r[k]) for k in columns])
+            fh.write(line+'\n')
+
+
+
+
+        
+            
