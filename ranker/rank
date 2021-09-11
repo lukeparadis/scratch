@@ -27,7 +27,7 @@ class Ranker(object):
 
         with open(self.data_filename, 'r') as fh:
             data = json.load(fh)
-        self.pairs = data['pairs']
+        self.pairs = [tuple(p) for p in data['pairs']]
         loaded_choices = data['choices']
         self.choices = { (e['option1'],e['option2']) : e['choice'] for e in loaded_choices }
         self.counts = data['counts']
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     
     columns = ('option','rank','score','count','rounds')
     with open(output_file_csv, 'w') as fh:
-        fh.write(','.join(columns))
+        fh.write(','.join(columns) + '\n')
         for r in rankings:
             line = ','.join([str(r[k]) for k in columns])
             fh.write(line+'\n')
