@@ -38,7 +38,6 @@ class Ranker(object):
         saved_choices = [ { 'option1' : p[0], 'option2' : p[1], 'choice' : choice} for (p,choice) in self.choices.items() ]
 
         data = {
-            'scores' : self.scores,
             'pairs' : self.pairs,
             'choices' : saved_choices,
             'counts' : dict(self.counts),
@@ -69,7 +68,7 @@ class Ranker(object):
                     if count == num_to_rank:
                         break
 
-        self.compute_scores()
+        self.sum_counts()
         self.save()
 
         rankings = self.compute_rankings()
@@ -93,13 +92,10 @@ class Ranker(object):
         
         return choice
 
-    def compute_scores(self):
+    def sum_counts(self):
 
         self.rounds = Counter()
         self.counts = Counter()
-        self.scores = {}
-
-        #pprint.pprint(self.choices)
 
         for (opt1,opt2),choice in self.choices.items():
             self.rounds[opt1] += 1
@@ -107,29 +103,19 @@ class Ranker(object):
             
             if choice == 0:
                 self.counts[opt1] += 1
-                self.counts[opt2] -= 1
             else:
-                self.counts[opt1] -= 1
                 self.counts[opt2] += 1
 
-        for option in range(len(self.options)):
-            if option in self.rounds:
-                #self.scores[option] = self.counts[option] / self.rounds[option]
-                self.scores[option] = self.counts[option]
-            else:
-                #self.scores[option] = float('-inf')
-                self.scores[option] = 0
-
     def compute_rankings(self):
-            
-        sorted_scores = sorted(self.scores.items(), key=lambda k:k[1], reverse=True)
+       
+        counts = [(opt,self.counts[opt]) for opt in range(len(self.options))]
+        sorted_counts = sorted(counts, key=lambda k:k[1], reverse=True)
       
         rankings = []
 
-        for k,(opt,score) in enumerate(sorted_scores):
+        for k,(opt,score) in enumerate(sorted_counts):
             element = {
                 'option' : self.options[opt],
-                'score' : score,
                 'rank' : k+1,
                 'count' : self.counts[opt],
                 'rounds' : self.rounds[opt],
@@ -178,7 +164,7 @@ if __name__ == '__main__':
     with open(output_file_json, 'w') as fh:
         json.dump(rankings, fh, sort_keys=True, indent=4)
     
-    columns = ('option','rank','score','count','rounds')
+    columns = ('rank', 'option','count','rounds')
     with open(output_file_csv, 'w') as fh:
         fh.write(','.join(columns) + '\n')
         for r in rankings:
