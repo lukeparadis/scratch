@@ -1,0 +1,3 @@
+compare pairs for options that have few comparisons
+something with the variance, select pairs with the highest/lowest variance?
+score = sum / rounds

@@ -1,0 +1,9 @@
+Gorelick - High Performance Python
+Jaworski - Expert Python Programming
+Lott - Mastering Object-Oriented Python
+Lutz - Programming Python
+Percival - Architecture Patterns with Python
+Philips - Python 3 Objected-Oriented Programming 3rd
+Ramalho - Fluent Python
+Slatkin  - Effective Python
+Viafore - Robust Python

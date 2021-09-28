@@ -1,0 +1,56 @@
+[
+    {
+        "count": 3,
+        "option": "Gorelick - High Performance Python",
+        "rank": 1,
+        "rounds": 3
+    },
+    {
+        "count": 2,
+        "option": "Lutz - Programming Python",
+        "rank": 2,
+        "rounds": 2
+    },
+    {
+        "count": 2,
+        "option": "Ramalho - Fluent Python",
+        "rank": 3,
+        "rounds": 4
+    },
+    {
+        "count": 1,
+        "option": "Jaworski - Expert Python Programming",
+        "rank": 4,
+        "rounds": 2
+    },
+    {
+        "count": 1,
+        "option": "Lott - Mastering Object-Oriented Python",
+        "rank": 5,
+        "rounds": 1
+    },
+    {
+        "count": 1,
+        "option": "Philips - Python 3 Objected-Oriented Programming 3rd",
+        "rank": 6,
+        "rounds": 2
+    },
+    {
+        "count": 0,
+        "option": "Percival - Architecture Patterns with Python",
+        "rank": 7,
+        "rounds": 1
+    },
+    {
+        "count": 0,
+        "option": "Slatkin  - Effective Python",
+        "rank": 8,
+        "rounds": 2
+    },
+    {
+        "count": 0,
+        "option": "Viafore - Robust Python",
+        "rank": 9,
+        "rounds": 3
+    }
+]
