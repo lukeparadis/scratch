@@ -9,6 +9,7 @@ import fire
 import math
 from dateutil import tz
 import sys
+from scipy.stats import linregress
 
 TZ = 'US/Eastern'
 tz = tz.gettz(TZ)
@@ -28,72 +29,63 @@ def date_to_str(date):
 def str_to_date(string):
     return arrow.get(string).replace(tzinfo=tz)
 
+
 class Lean:
 
     def __init__(self):
 
         script_dir = Path(__file__).absolute().parent
-        backup_dir = script_dir / '.bak'
-        backup_fn = backup_dir / f'lean-{get_timestamp()}.json'
-        self.data_fn = script_dir / 'lean.json'
+        self.data_fn = script_dir / 'data.json'
         
-        if not backup_dir.exists():
-            backup_dir.mkdir()
-
         if self.data_fn.exists():
-            shutil.copyfile(self.data_fn, backup_fn)
             with self.data_fn.open('r') as fh:
                 data = json.load(fh)
                 self.load(data)
         else:
-            self.samples = []
-            self.rate = 1
+            self.dates = []
+            self.values = []
             self.target = 0
 
         self.save()
 
+    def print(self):
+        
+        print(f'target: {self.target}')
+        print('samples:')
+        for k in range(len(self.dates)):
+            print(f' {date_to_str(self.dates[k])}: {self.values[k]}')
+
     def load(self, data):
 
-        self.samples = [{ 
-            'date' : str_to_date(d['date']),
-            'weight' : float(d['weight'])
-            } 
-            for d in data['samples'] ]
-        
-        self.rate = float(data['rate'])
-        self.target = float(data['target'])
+        self.dates = [str_to_date(d) for d in data['dates']]
+        self.values = data['values']
+        self.target = data['target']
 
     def save(self):
 
-        samples = [
-            { 'date' : date_to_str(d['date']), 'weight' : d['weight'] }
-            for d in self.samples ]
-        
         data = {
-            'samples' : samples,
-            'rate' : self.rate,
+            'dates': [date_to_str(d) for d in self.dates],
+            'values' : self.values,
             'target' : self.target
         }
 
         with self.data_fn.open('w') as fh:
             json.dump(data, fh, sort_keys=True, indent=4)
 
-    def set_target(self, target, rate):
+    def set_target(self, target):
 
         target = float(target)
-        rate = float(rate)
 
-        print(f'setting target: {target}, rate: {rate}')
+        print(f'setting target: {target}')
 
-        if target < 0 or rate <= 0:
-            raise ValueError('target must be >= 0, rate > 0')
+        if target < 0:
+            raise ValueError('target must be >= 0')
         
         self.target = target
-        self.rate = rate
 
         self.save()
 
-    def insert(self, weight, date=None):
+    def insert(self, value, date=None):
 
         if date is None:
             date = get_datestamp()
@@ -101,19 +93,30 @@ class Lean:
         # make sure its a valid datetime
         date = str_to_date(date)
 
-        print(f'inserting {weight}lbs on {date}')
+        if date in self.dates:
+            print(f'error sample already exists for {date}')
+            sys.exit()
 
-        self.samples.append({
-            'date' : date,
-            'weight' : float(weight)
-        })
+        print(f'inserting value:{value} on date:{date_to_str(date)}')
+
+        samples = sorted(list(zip(self.dates, self.values)) + [(date,value)])
+        self.dates, self.values = list(zip(*samples))
 
         self.save()
 
-    def plot(self, target=None, rate=None):
+    '''
+    def plot(self, target=None, rate=None, use_emperical=False):
 
         target = self.target if target is None else target
-        rate = self.rate if rate is None else rate
+      
+        if rate is None:
+            if len(self.samples) > 1 and use_emperical:
+                dw = self.samples[0]['weight'] - self.samples[-1]['weight']
+                dt = (self.samples[-1]['date'] - self.samples[0]['date']).days
+
+                rate = dw / dt
+            else:
+                rate = self.rate
 
         if len(self.samples) == 0:
             print('no samples to plot')
@@ -137,13 +140,60 @@ class Lean:
       
         chart = pygal.DateLine(x_label_rotation=45, show_dots=False)
         chart.add('progress', psamples)
-        chart.add('target', tsamples)
+        chart.add(f'rate:{rate:.2f}', tsamples)
 
         chart.title = 'progress'
         chart.x_title = 'time'
         chart.y_title = 'weight'
 
         chart.render_to_file('./lean.svg')
+
+    '''
+    def regress(self, last):
+
+        last = min(last, len(self.dates))
+
+        values = self.values[-last:]
+        times = [(d-self.dates[-last]).days for d in self.dates[-last:]]
+
+        m,b = linregress(times, values)[:2]
+
+        return m, b
+
+    def plot(self, last=5):
+
+        if len(self.dates) == 0:
+            print('no samples to plot')
+            sys.exit(1)
+
+        m,b = self.regress(last)
+
+        target_days = int((self.target - b) / m)
+        print('days:',target_days)
+        print('date:',self.dates[-last].shift(days=target_days))
+
+        initial = len(self.dates) - last
+
+        fit_days = range(-initial,target_days)
+        fit_values = [(b+d*m) for d in fit_days]
+        fit_timestamps = [self.dates[-last].shift(days=d).timestamp() for d in fit_days]
+        
+        fit_values = [fit_values[k] for k in (0,-1)]
+        fit_timestamps = [fit_timestamps[k] for k in (0,-1)]
+
+        fit = list(zip(fit_timestamps, fit_values))
+        obs = list(zip([d.timestamp() for d in self.dates], self.values))
+
+        chart = pygal.DateLine(x_label_rotation=45, show_dots=False)
+        chart.add('progress', obs)
+        chart.add(f'projected', fit)
+
+        chart.title = 'progress'
+        chart.x_title = 'time'
+        chart.y_title = 'weight'
+
+        chart.render_to_file('./plot.svg')
+
 
 if __name__ == '__main__':
     fire.Fire(Lean)

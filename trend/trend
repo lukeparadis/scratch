@@ -1,0 +1,63 @@
+#! /usr/bin/env python3
+
+from pathlib import Path
+import arrow
+import pygal
+import shutil
+import json
+import fire
+import math
+from dateutil import tz
+import sys
+import numpy as np
+
+TZ = 'US/Eastern'
+tz = tz.gettz(TZ)
+
+time_format = 'YYYY-MM-DD-HH-mm-ss'
+date_format = 'YYYY-MM-DD'
+
+def get_timestamp():
+    return arrow.utcnow().to(TZ).format(time_format)
+
+def get_datestamp():
+    return arrow.utcnow().to(TZ).format(date_format)
+
+def date_to_str(date):
+    return date.format(date_format)
+
+def str_to_date(string):
+    return arrow.get(string).replace(tzinfo=tz)
+
+def plot(ts, ys):
+   
+    tstamps = [t.timestamp() for t in ts]
+    samples = list(zip(tstamps, ys))
+
+    chart = pygal.DateLine(x_label_rotation=45, show_dots=True, stroke=False)
+    chart.add('samples', samples)
+
+    chart.title = 'plot'
+    chart.x_title = 'time'
+    chart.y_title = 'value'
+
+    chart.render_to_file('./test.svg')
+
+if __name__ == '__main__':
+
+    np.random.seed(0)
+
+    m = 10
+    b = 12
+    s = 50.0
+    n = 100
+
+    xs = np.arange(n)
+    ys = m*xs + b + s * np.random.randn(n)
+
+    tstart = arrow.get('2021-01-01') 
+    ts = [tstart.shift(days=int(x)) for x in xs]
+
+    plot(ts, ys)
+
+

@@ -1,0 +1,8 @@
+metrics
+    calc
+        loss rate
+        time to / date of target
+    for
+        all samples
+        last n samples
+dont allow dupe samples

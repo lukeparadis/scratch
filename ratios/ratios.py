@@ -1,9 +1,24 @@
 import numpy as np
 import fire
 
-def calc_score(scalar, ratios):
-    scaled = scalar * ratios
-    return np.abs((scaled.round()-scaled)).sum()
+def calc_quantities(scalars, ratios):
+
+    results = []
+
+    for scalar in scalars:
+        scaled = scalar * ratios
+        values = scaled.round().astype('int')
+        errors = scaled - values
+        error = np.abs(errors).sum()
+        results.append({
+            'error' : error,
+            'pct_error' : 100*error / scalar,
+            'values' : values,
+            'errors' : errors,
+            'scalar' : scalar,
+        })
+
+    return sorted(results, key=lambda k: k['error'])
 
 def load_csv(filename):
     with open(filename, 'r') as fh:
@@ -12,31 +27,32 @@ def load_csv(filename):
         values = np.array([float(line[1]) for line in lines])
         return keys, values
 
-def process(filename, mins=100, maxs=2000, top=5):
+def process(filename, mins=100, maxs=2000, deltas=1, top=5):
 
     keys, ratios = load_csv(filename)
-    scalars = np.arange(mins, maxs)
 
-    results = [(scalar, calc_score(scalar, ratios)) for scalar in scalars]
+    if type(deltas) != int or type(mins) != int or type(maxs) != int:
+        print(f'mins: {mins}, maxs: {maxs}, deltas: {deltas} must all be int')
+        sys.exit(1)
 
-    top = sorted(results, key=lambda k: k[1])
+    scalars = np.arange(mins, maxs+deltas, deltas)
+    results = calc_quantities(scalars, ratios)
 
     print('target ratios')
-    for k,r in enumerate(ratios):
-        print(f' {keys[k]+":20"} {r:10.2f}')
+    for k,key in enumerate(keys):
+        print(f' {key:20} {ratios[k]:10.5f}')
     print()
 
-    for k in range(5):
-        scalar = top[k][0]
-        scaled = scalar * ratios
-        #score = f'{top[k][1]:.3f}'.rstrip('0').rstrip('.')
-        score = top[k][1]
+    for k in range(top):
         print(f'rank: {k+1}')
-        print(f' total:      {scalar:3}')
-        print(f' error:      {score:5.3}')
+        print(f' total:      {results[k]["scalar"]:5}')
+        print(f' error:      {results[k]["error"]:5.3}')
+        print(f' pct error:  {results[k]["pct_error"]:5.3f}')
         print(f' components:')
-        for p,s in enumerate(scaled):
-            print(f'  {keys[p]+":":20} {s:10.2f}')
+        for c,key in enumerate(keys):
+            value = results[k]['values'][c]
+            error = results[k]['errors'][c]
+            print(f'  {key+":":20} {value:3}  ({error:5.2f})')
         print()
 
 if __name__ == '__main__':
